@@ -2,3 +2,4 @@
 __pycache__/
 practice/
 data/*.html
+data/*.db
