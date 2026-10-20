@@ -1,3 +1,4 @@
 # Pythonの自動生成キャッシュ
 __pycache__/
 practice/
+data/*.html
