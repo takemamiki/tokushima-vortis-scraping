@@ -20,6 +20,7 @@ parse_match.py が抽出した試合データを、SQLite（data/vortis.db）に
     - match_date は、今は game_id の先頭8桁から作っている（暫定）。
 """
 
+import os
 import re
 import sqlite3
 
@@ -70,6 +71,7 @@ MINUTE_PATTERN = re.compile(r"(\d+)'(?:\+(\d+))?")
 
 def _connect() -> sqlite3.Connection:
     """データベースに接続し、テーブルがなければ作る"""
+    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     with conn:
         conn.execute(CREATE_MATCHES_SQL)
