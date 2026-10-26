@@ -58,12 +58,18 @@ def parse_match(payload, match_id):
     away_pos, away = find_team(payload, "awayTeam")
     home_pos, home = find_team(payload, "homeTeam")
 
+    if home is None or away is None:
+        raise ValueError(f"{match_id}: チームデータが見つかりません")
+
     # awayTeam と homeTeam の間にある "$D…" の日付を探す
     date_raw = None
     for pos, v in get_all_values(payload, "date"):
         if isinstance(v, str) and v.startswith("$D") and away_pos < pos < home_pos:
             date_raw = v
             break
+
+    if date_raw is None:
+        raise ValueError(f"{match_id}: 試合日が見つかりません")
 
     utc = datetime.fromisoformat(date_raw.replace("$D", "").replace("Z", "+00:00"))
     jst = utc.astimezone(timezone(timedelta(hours=9)))
@@ -75,7 +81,7 @@ def parse_match(payload, match_id):
         for p in team["playerScoreList"]:
             goals.append({
                 "club": club,
-                "scorer": p["name"],
+                "scorer": normalize(p["name"]),
                 "minute": p["scoreTime"],
                 "is_own_goal": p["ownGoal"],
             })
@@ -92,7 +98,7 @@ def parse_match(payload, match_id):
 
 
 if __name__ == "__main__":
-    match_id = "101015"
+    match_id = "102412"
     html = fetch_match_html(match_id)
     payload = extract_payload(html)
     result = parse_match(payload, match_id)
