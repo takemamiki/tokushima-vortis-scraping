@@ -30,6 +30,7 @@ if __name__ == "__main__":
     print(f"見つかった試合数: {len(urls)}")
 
     saved_count = 0
+    failed_ids = []
     for url in urls:
         game_id = extract_game_id(url)
 
@@ -39,8 +40,15 @@ if __name__ == "__main__":
 
         print(f"取得中: {game_id}")
 
-        html = fetch_match_html(url)
-        match_data = parse_match(html)
+        try:
+            html = fetch_match_html(url)
+            match_data = parse_match(html)
+        except ValueError as e:
+            print(f"スキップしました: {game_id} ({e})")
+            failed_ids.append(game_id)
+            time.sleep(WAIT_SECONDS)
+            continue
+        
         match_data["game_id"] = game_id
 
         if save_match_data(match_data):
@@ -49,3 +57,7 @@ if __name__ == "__main__":
         time.sleep(WAIT_SECONDS)
 
     print(f"完了しました（新しく保存した試合: {saved_count}）")
+    
+    if failed_ids:
+        print(f"スキップした試合: {failed_ids} (次回の実行でもう一度取りに行きます) ")
+
