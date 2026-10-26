@@ -34,9 +34,14 @@ def parse_match(html: str) -> dict:
     """
     soup = BeautifulSoup(html, "html.parser")
 
-    home_club = soup.find("div", class_="home").find("figcaption").get_text(strip=True)
-    away_club = soup.find("div", class_="away").find("figcaption").get_text(strip=True)
+    home_div = soup.find("div", class_="home")
+    away_div = soup.find("div", class_="away")
+    if home_div is None or away_div is None:
+        raise ValueError("チーム名の場所が見つかりません（ページの中身が想定と違う可能性)")
 
+    home_club = home_div.find("figcaption").get_text(strip=True)
+    away_club = away_div.find("figcaption").get_text(strip=True)
+   
     home_score_div = soup.find("div", class_="homeScore")
     away_score_div = soup.find("div", class_="awayScore")
 
