@@ -52,6 +52,19 @@ def normalize(name):
     """全角の英数字を半角にそろえる（ＦＣ今治 → FC今治）"""
     return unicodedata.normalize("NFKC", name)
 
+def parse_score_time(text):
+    """
+    得点時間を、分と追加時間に分ける。
+    "28'"   → (28, 0)
+    "90+2'" → (90, 2)
+    """
+    t = normalize(text).replace("'", "").strip()
+
+    if "+" in t:
+        minute, added = t.split("+")
+        return int(minute), int(added)
+
+    return int(t), 0
 
 def parse_match(payload, match_id):
     """payload から日付・チーム名・スコア・得点者を取り出して dict で返す"""
