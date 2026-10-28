@@ -92,27 +92,45 @@ def parse_match(payload, match_id):
     for team in [home, away]:
         club = normalize(team["name"])
         for p in team["playerScoreList"]:
+            minute, added_time = parse_score_time(p["scoreTime"])
             goals.append({
                 "club": club,
                 "scorer": normalize(p["name"]),
-                "minute": p["scoreTime"],
-                "is_own_goal": p["ownGoal"],
+                "minute": minute,
+                "added_time": added_time,
+                "is_own_goal": int(p["ownGoal"]),
             })
+
+    home_club = normalize(home["name"])
+    home_goals = sum(1 for g in goals if g["club"] == home_club)
+    away_goals = len(goals) - home_goals
+    if home_goals != int(home["score"]) or away_goals != int(away["score"]):
+        raise ValueError(
+            f"{match_id}: 得点者の数がスコアと合いません"
+            f"（ホーム {home_goals}/{home['score']}、アウェイ {away_goals}/{away['score']}）"
+        )
 
     return {
         "match_id": match_id,
         "match_date": jst.strftime("%Y-%m-%d"),
         "home_club": normalize(home["name"]),
-        "home_score": home["score"],
+        "home_score": int(home["score"]),
         "away_club": normalize(away["name"]),
-        "away_score": away["score"],
+        "away_score": int(away["score"]),
         "goals": goals,
     }
 
 
 if __name__ == "__main__":
-    match_id = "102412"
-    html = fetch_match_html(match_id)
-    payload = extract_payload(html)
-    result = parse_match(payload, match_id)
-    print(result)
+    import time
+
+    for match_id in ["102412", "092613", "101718", "101719"]:
+        try:
+            html = fetch_match_html(match_id)
+            payload = extract_payload(html)
+            result = parse_match(payload, match_id)
+            print(result)
+        except Exception as e:
+            print("エラー:", e)
+        print("-" * 40)
+        time.sleep(2)
