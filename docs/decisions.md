@@ -33,3 +33,15 @@
 
 - 既存の vortis.db の扱い（作り直すか、残して移行するか）
 - vortis.jp 用のコード（fetch_match.py / parse_match.py など）の扱い
+
+## 2026-10-29 game_id の作り方を確定
+
+- URL の年は「試合日の年」（シーズンではない）。例：2026-27シーズン第24節 → /match/j2/2027/022718/
+- 番号は「月日4桁＋2桁」。毎年同じ番号が出うるので、game_id = 試合日の年 ＋ 番号（例：2027022718）
+- 試合日が未確定（「2/27 or 2/28」）の試合は番号が変わる可能性がある → 保存は試合終了後のみ
+- 節（第◯節）は試合ページから取得できる。シーズンは URL にないので、必要なら別の列にする
+
+## 2026-10-29 外部キーのチェックを有効にした
+
+- save_data.py の _connect() に `PRAGMA foreign_keys = ON` を追加（SQLiteは初期設定でオフ、接続ごとに必要）
+- check_fk.py で確認：PRAGMA foreign_keys = 1、存在しない game_id の goals への INSERT が「FOREIGN KEY constraint failed」で止まることを確認

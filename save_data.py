@@ -73,6 +73,7 @@ def _connect() -> sqlite3.Connection:
     """データベースに接続し、テーブルがなければ作る"""
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
+    conn.execute("PRAGMA foreign_keys = ON")
     with conn:
         conn.execute(CREATE_MATCHES_SQL)
         conn.execute(CREATE_GOALS_SQL)
