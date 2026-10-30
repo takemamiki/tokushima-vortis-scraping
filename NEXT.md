@@ -1,12 +1,10 @@
 ## 次
 
-- 確認に使った4試合（102412 普通／092613 OG／101718 0-0／101719 アディショナルタイム）を test_fetch_jleague.py に入れる
-- fetch_jleague.py の home_score / away_score を int() でそろえる（未対応なら）
-- jleague.jp の robots.txt と利用規約を確認する
-- matches テーブルの構造を確認する
-- game_id を「試合日の年 ＋ Jリーグ公式の番号」で作る。その前に、URL の年がシーズンを表すのか、番号がシーズンをまたいで重ならないかを確かめる
-- section（節）列を足すか決める
-- save_data.py で `PRAGMA foreign_keys = ON` を実行しているか確認する　⇒【完了】
-- 既存の vortis.db をどうするか決める（vortis_old.db に名前を変えて残し、Jリーグ公式から作り直す案）
+- 使っていないファイルを片付ける（fetch_match.py / parse_match.py / find_vortis_schedule.py / check_*.py / probe_*.py）
+- 試合番号を Jリーグ公式から自動で集める（B案）。match_list.txt を答え合わせに使う。sitemap.xml がヒントになるかもしれない
+- 要確認：第4節の番号 082919 が vortis.jp の game 番号と同じだった。偶然か、両サイトで番号がそろっているのか
+- win_draw_lose.sql の引き分けは「スコアが同じ試合」を全部数えている。徳島以外の試合を入れる前に、徳島の試合だけに絞る
+- main.py / save_data.py のファイルの場所（match_list.txt、data/vortis.db）を、実行した場所ではなく main.py の隣を基準にする
+- matplotlib でグラフにする（得点時間帯の分布など）
 
 決めたこと・確認したことは docs/decisions.md に書く。

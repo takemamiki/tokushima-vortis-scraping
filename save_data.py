@@ -1,42 +1,38 @@
 """
 save_data.py
-parse_match.py が抽出した試合データを、SQLite（data/vortis.db）に保存する。
+fetch_jleague.py の parse_match が返した試合データを、SQLite（data/vortis.db）に保存する。
 
 役割：1試合ぶんのデータを、matches テーブルと goals テーブルにまとめて保存すること。
-    HTMLからデータを取り出すのは、parse_match.pyの役目。
+    ページからデータを取り出すのは fetch_jleague.py の役目。
 
 テーブル：
-    matches … 1試合＝1行（スコアなど）
-    goals   … 1得点＝1行（得点者・得点時間など）
+    matches … 1試合＝1行（シーズン・節・試合日・スコア）
+    goals   … 1得点＝1行（得点者・得点時間・オウンゴールか）
 
-前提（2026/10/19 に確認）：
-    scorers / minutes は「ホームの得点 → アウェイの得点」の順に並んでいる。
-    先頭から home_score 個がホームチームの得点、残りがアウェイチームの得点。
-
-ルール：
+ルール（docs/decisions.md）：
+    - 得点者は goals テーブルだけを正とする（matches に scorers / minutes 列は持たない）。
+    - オウンゴールの club は「得点が入ったチーム」。
     - matches と goals は1つのトランザクションでまとめて保存する（片方だけ入ることはない）。
-    - 得点者の数とスコアの合計が合わない試合は、どちらにも保存せずに警告を出す。
+    - チームごとの得点者の数がスコアと合わない試合は、どちらにも保存しない。
     - 同じ game_id は二重に保存しない（PRIMARY KEY と INSERT OR IGNORE）。
-    - match_date は、今は game_id の先頭8桁から作っている（暫定）。
+    - 接続ごとに PRAGMA foreign_keys = ON を実行する。
 """
 
 import os
-import re
 import sqlite3
 
 DB_PATH = "data/vortis.db"
-OWN_GOAL = "オウンゴール"
 
 CREATE_MATCHES_SQL = """
 CREATE TABLE IF NOT EXISTS matches (
-    game_id    TEXT PRIMARY KEY,
-    match_date TEXT,
-    home_club  TEXT NOT NULL,
-    away_club  TEXT NOT NULL,
-    home_score INTEGER,
-    away_score INTEGER,
-    scorers    TEXT,
-    minutes    TEXT
+    game_id    TEXT    PRIMARY KEY,
+    season     TEXT    NOT NULL,
+    section    INTEGER NOT NULL,
+    match_date TEXT    NOT NULL,
+    home_club  TEXT    NOT NULL,
+    away_club  TEXT    NOT NULL,
+    home_score INTEGER NOT NULL,
+    away_score INTEGER NOT NULL
 )
 """
 
@@ -55,65 +51,48 @@ CREATE TABLE IF NOT EXISTS goals (
 
 INSERT_MATCH_SQL = """
 INSERT OR IGNORE INTO matches
-    (game_id, match_date, home_club, away_club, home_score, away_score, scorers, minutes)
+    (game_id, season, section, match_date, home_club, away_club, home_score, away_score)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 """
 
 INSERT_GOAL_SQL = """
-INSERT OR IGNORE INTO goals
+INSERT INTO goals
     (game_id, club, scorer, minute, added_time, is_own_goal)
 VALUES (?, ?, ?, ?, ?, ?)
 """
 
-# 「90'+2」→ (90, 2)、「15'」→ (15, 0)
-MINUTE_PATTERN = re.compile(r"(\d+)'(?:\+(\d+))?")
 
-
-def _connect() -> sqlite3.Connection:
+def _connect(db_path: str = DB_PATH) -> sqlite3.Connection:
     """データベースに接続し、テーブルがなければ作る"""
-    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
-    conn = sqlite3.connect(DB_PATH)
+    folder = os.path.dirname(db_path)
+    if folder:
+        os.makedirs(folder, exist_ok=True)
+    conn = sqlite3.connect(db_path)
     conn.execute("PRAGMA foreign_keys = ON")
     with conn:
         conn.execute(CREATE_MATCHES_SQL)
         conn.execute(CREATE_GOALS_SQL)
-        _add_match_date_column(conn)
+    _check_new_layout(conn, db_path)
     return conn
 
 
-def _add_match_date_column(conn: sqlite3.Connection) -> None:
+def _check_new_layout(conn: sqlite3.Connection, db_path: str) -> None:
     """
-    昔の matches テーブル（match_date 列がない）に列を足し、空欄を埋める。
-    新しく作ったテーブルには最初から列があるので、何もしない。
+    昔の形（vortis.jp 時代）の matches テーブルだったら止める。
+    CREATE TABLE IF NOT EXISTS は、同じ名前のテーブルがあると何もしないため。
     """
-    columns = [row[1] for row in conn.execute("PRAGMA table_info(matches)")]
-    if "match_date" not in columns:
-        conn.execute("ALTER TABLE matches ADD COLUMN match_date TEXT")
-
-    # game_id の先頭8桁「20261010」→「2026-10-10」
-    conn.execute("""
-        UPDATE matches
-        SET match_date = substr(game_id, 1, 4) || '-' || substr(game_id, 5, 2) || '-' || substr(game_id, 7, 2)
-        WHERE match_date IS NULL
-    """)
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(matches)")}
+    if "season" not in columns or "scorers" in columns:
+        conn.close()
+        raise RuntimeError(
+            f"{db_path} は昔の形のテーブルです。"
+            "vortis_old.db などに名前を変えてから、もう一度実行してください"
+        )
 
 
-def _to_match_date(game_id: str) -> str:
-    """game_id の先頭8桁から日付（YYYY-MM-DD）を作る（暫定）"""
-    return f"{game_id[0:4]}-{game_id[4:6]}-{game_id[6:8]}"
-
-
-def _parse_minute(text: str) -> tuple[int, int]:
-    """得点時間の文字列を (分, アディショナルタイム) に分ける"""
-    m = MINUTE_PATTERN.fullmatch(text.strip())
-    if m is None:
-        raise ValueError(f"得点時間の形式が読めません: {text!r}")
-    return int(m.group(1)), int(m.group(2) or 0)
-
-
-def is_already_saved(game_id) -> bool:
+def is_already_saved(game_id, db_path: str = DB_PATH) -> bool:
     """matches テーブルに、指定した game_id が既にあるかを確認する"""
-    conn = _connect()
+    conn = _connect(db_path)
     try:
         row = conn.execute(
             "SELECT 1 FROM matches WHERE game_id = ?", (str(game_id),)
@@ -123,57 +102,55 @@ def is_already_saved(game_id) -> bool:
     return row is not None
 
 
-def save_match_data(match_data: dict) -> bool:
-    """
-    試合データ（辞書）を、matches と goals にまとめて保存する。
-    保存できたら True、スキップしたら False を返す。
-    """
-    game_id = str(match_data["game_id"])
-    home_club = match_data["home_club"]
-    away_club = match_data["away_club"]
-    home_score = int(match_data["home_score"])
-    away_score = int(match_data["away_score"])
-    scorers = list(match_data["scorers"])
-    minutes = list(match_data["minutes"])
+def _check_goals(match: dict) -> None:
+    """チームごとの得点者の数がスコアと合うか確かめる（合わなければ ValueError）"""
+    home_goals = sum(1 for g in match["goals"] if g["club"] == match["home_club"])
+    away_goals = sum(1 for g in match["goals"] if g["club"] == match["away_club"])
+    other = len(match["goals"]) - home_goals - away_goals
 
-    total = home_score + away_score
-    if not (len(scorers) == len(minutes) == total):
-        print(f"【警告】件数が合わないため保存しません: {game_id} "
-              f"（スコア合計{total}、得点者{len(scorers)}、得点時間{len(minutes)}）")
-        return False
+    if other or home_goals != match["home_score"] or away_goals != match["away_score"]:
+        raise ValueError(
+            f"{match['game_id']}: 得点者の数がスコアと合いません"
+            f"（ホーム {home_goals}/{match['home_score']}、"
+            f"アウェイ {away_goals}/{match['away_score']}、どちらでもない {other}）"
+        )
 
-    conn = _connect()
+
+def save_match_data(match: dict, db_path: str = DB_PATH) -> bool:
+    """
+    試合データ（fetch_jleague.parse_match の戻り値）を、matches と goals にまとめて保存する。
+    保存できたら True、保存済みでスキップしたら False を返す。
+    得点者の数がスコアと合わない場合は ValueError（何も保存しない）。
+    """
+    _check_goals(match)
+
+    conn = _connect(db_path)
     try:
         with conn:  # ここから下は「全部成功」か「全部取り消し」のどちらか
             cur = conn.execute(INSERT_MATCH_SQL, (
-                game_id,
-                _to_match_date(game_id),
-                home_club,
-                away_club,
-                home_score,
-                away_score,
-                str(scorers),  # 元の形も念のため残しておく
-                str(minutes),
+                str(match["game_id"]),
+                match["season"],
+                int(match["section"]),
+                match["match_date"],
+                match["home_club"],
+                match["away_club"],
+                int(match["home_score"]),
+                int(match["away_score"]),
             ))
             if cur.rowcount == 0:
-                print(f"既に保存済みのためスキップ: {game_id}")
+                print(f"既に保存済みのためスキップ: {match['game_id']}")
                 return False
 
-            for i, (scorer, minute_text) in enumerate(zip(scorers, minutes)):
-                club = home_club if i < home_score else away_club
-                minute, added_time = _parse_minute(minute_text)
-                is_own_goal = 1 if scorer == OWN_GOAL else 0
+            for g in match["goals"]:
                 conn.execute(INSERT_GOAL_SQL, (
-                    game_id, club, scorer, minute, added_time, is_own_goal,
+                    str(match["game_id"]),
+                    g["club"],
+                    g["scorer"],
+                    int(g["minute"]),
+                    int(g["added_time"]),
+                    int(g["is_own_goal"]),
                 ))
     finally:
         conn.close()
 
     return True
-
-
-if __name__ == "__main__":
-    from parse_match import match_data
-
-    if save_match_data(match_data):
-        print(f"データベースに保存しました: {DB_PATH}")

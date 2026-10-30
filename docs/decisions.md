@@ -5,9 +5,9 @@
 ## データベース
 
 - 2026-10-20：保存先は CSV をやめて SQLite（data/vortis.db）に一本化する
-- 2026-10-27：得点者は goals テーブルだけを正とする。matches の scorers / minutes 列は使わない（列は残す。Jリーグ公式の試合では空のまま）
+- 2026-10-27：得点者は goals テーブルだけを正とする。matches の scorers / minutes 列は使わない（→ 2026-10-29 に列ごとなくすと変更）
 - 2026-10-28：オウンゴールの club は「得点が入ったチーム」を入れる（オウンゴールした選手の所属チームではない）。club ごとの得点数が試合のスコアと一致するようにするため
-- 2026-10-28：goals の外部キー（REFERENCES matches）は、接続ごとに `PRAGMA foreign_keys = ON` を実行しないとチェックされない。save_data.py で実行しているか未確認
+- 2026-10-28：goals の外部キー（REFERENCES matches）は、接続ごとに `PRAGMA foreign_keys = ON` を実行しないとチェックされない（→ 2026-10-29 に対応済み）
 
 ## Jリーグ公式のデータで確認したこと（2026-10-28）
 
@@ -22,17 +22,17 @@
 
 - 2026-10-28：取得元を Jリーグ公式サイト（jleague.jp）に一本化する。vortis.jp からの取得はやめる。同じ試合が2つの番号で二重に保存されるのを防ぐため、また徳島以外の J2 チームにも広げるため
 - 2026-10-28：既存の徳島の試合も Jリーグ公式から取り直す
-- 未確認：jleague.jp の robots.txt と利用規約
+- 2026-10-29：jleague.jp の robots.txt と利用規約を確認し、問題なしと判断（10-30 の項も参照）
 
 ## game_id
 
 - 2026-10-27：Jリーグ公式の試合の game_id は「試合日の年 ＋ Jリーグ公式の番号」で作る方針（"2026" の決め打ちは年をまたぐと壊れるため）
-- 未確認：URL の年（/2026/）がシーズンを表すのか、番号がシーズンやリーグをまたいで重ならないか
+- （2026-10-29 に確認済み。下の「game_id の作り方を確定」を参照）
 
 ## 未決定
 
-- 既存の vortis.db の扱い（作り直すか、残して移行するか）
 - vortis.jp 用のコード（fetch_match.py / parse_match.py など）の扱い
+- （既存の vortis.db の扱いは 2026-10-30 に決定：vortis_old.db として残し、Jリーグ公式から作り直した）
 
 ## 2026-10-29 game_id の作り方を確定
 
@@ -45,3 +45,13 @@
 
 - save_data.py の _connect() に `PRAGMA foreign_keys = ON` を追加（SQLiteは初期設定でオフ、接続ごとに必要）
 - check_fk.py で確認：PRAGMA foreign_keys = 1、存在しない game_id の goals への INSERT が「FOREIGN KEY constraint failed」で止まることを確認
+## 2026-10-30 Jリーグ公式から DB を作り直した
+
+- jleague.jp の robots.txt と利用規約は 2026-10-29 に確認済み（問題なし）。10-30 に robots.txt を再確認：`/match/*/201*`（2010〜2019年の試合ページ）は取得禁止。2020年以降の /match/j2/ は対象外で取得可
+- matches テーブルの列は game_id / season / section / match_date / home_club / away_club / home_score / away_score。scorers / minutes 列はなくした（得点者は goals だけを正とする）
+- save_data.py は fetch_jleague.parse_match の戻り値をそのまま保存する。昔の形（scorers 列あり）の DB を開いたら止まる
+- goals の INSERT は OR IGNORE を外した。二重保存は matches 側で防ぎ、goals で重なったらエラーで止めて全部取り消す
+- 取得する試合は、当面 match_list.txt に手で書く（A案）。1行1試合「年 番号」。試合が終わってから1行足して python main.py を実行する
+- 古い DB は data/vortis_old.db として手元に残す（GitHub には上げない）
+- 作り直した DB を確認：13試合（第1〜13節）、5勝2分6敗、goals 24件（徳島11・相手13）。match_list.txt に手で書いたスコアと一致
+- SQL の文字列は '（シングルクォート）で囲む。"（ダブル）は本来、列やテーブルの名前に使う記号
