@@ -31,7 +31,7 @@
 
 ## 未決定
 
-- vortis.jp 用のコード（fetch_match.py / parse_match.py など）の扱い
+- （vortis.jp 用のコードの扱いは 2026-10-30 に決定：下の項を参照）
 - （既存の vortis.db の扱いは 2026-10-30 に決定：vortis_old.db として残し、Jリーグ公式から作り直した）
 
 ## 2026-10-29 game_id の作り方を確定
@@ -55,3 +55,4 @@
 - 古い DB は data/vortis_old.db として手元に残す（GitHub には上げない）
 - 作り直した DB を確認：13試合（第1〜13節）、5勝2分6敗、goals 24件（徳島11・相手13）。match_list.txt に手で書いたスコアと一致
 - SQL の文字列は '（シングルクォート）で囲む。"（ダブル）は本来、列やテーブルの名前に使う記号
+- 2026-10-30：使わなくなったファイル（fetch_match.py / parse_match.py / find_vortis_schedule.py / check_fk.py / check_jleague.py / probe_keys.py / probe_match.py）は practice/ に移す（B案）。practice/ は .gitignore 済みなので GitHub からは消え、手元には残る
