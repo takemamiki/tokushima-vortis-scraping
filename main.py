@@ -14,6 +14,7 @@ SQLite（data/vortis.db）に保存する。
     - 1試合で失敗しても止まらずに次へ進み、最後に失敗した試合をまとめて表示する。
 """
 
+import os
 import re
 import time
 
@@ -27,7 +28,9 @@ from fetch_jleague import (
 )
 from save_data import is_already_saved, save_match_data
 
-MATCH_LIST_PATH = "match_list.txt"
+# どこから実行しても、このファイル（main.py）と同じフォルダを基準にする
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+MATCH_LIST_PATH = os.path.join(BASE_DIR, "match_list.txt")
 WAIT_SECONDS = 2
 
 # 「2026 102412」の形（年4桁、半角スペース、番号6桁）

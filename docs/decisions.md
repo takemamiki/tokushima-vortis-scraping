@@ -56,3 +56,9 @@
 - 作り直した DB を確認：13試合（第1〜13節）、5勝2分6敗、goals 24件（徳島11・相手13）。match_list.txt に手で書いたスコアと一致
 - SQL の文字列は '（シングルクォート）で囲む。"（ダブル）は本来、列やテーブルの名前に使う記号
 - 2026-10-30：使わなくなったファイル（fetch_match.py / parse_match.py / find_vortis_schedule.py / check_fk.py / check_jleague.py / probe_keys.py / probe_match.py）は practice/ に移す（B案）。practice/ は .gitignore 済みなので GitHub からは消え、手元には残る
+
+## 2026-11-01 ファイルの場所と勝敗の数え方を直した
+
+- main.py / save_data.py は、実行した場所ではなく、それぞれのファイルと同じフォルダを基準に match_list.txt と data/vortis.db を探す（os.path.abspath(__file__) を使う）。別のフォルダから実行しても、そのフォルダに data/ は作られないことを確認
+- queries/win_draw_lose.sql に WHERE を足し、徳島の試合だけを数える。他チーム同士の引き分けが混ざらないことを確認（今の DB では 5勝2分6敗のまま）
+- test_fetch_jleague.py と save_test_html.py は、まだ実行した場所を基準に data/ を探す（リポジトリのフォルダで実行すること）

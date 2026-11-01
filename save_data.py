@@ -21,7 +21,9 @@ fetch_jleague.py の parse_match が返した試合データを、SQLite（data/
 import os
 import sqlite3
 
-DB_PATH = "data/vortis.db"
+# どこから実行しても、このファイル（save_data.py）と同じフォルダの data/ を使う
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.path.join(BASE_DIR, "data", "vortis.db")
 
 CREATE_MATCHES_SQL = """
 CREATE TABLE IF NOT EXISTS matches (
