@@ -62,3 +62,18 @@
 - main.py / save_data.py は、実行した場所ではなく、それぞれのファイルと同じフォルダを基準に match_list.txt と data/vortis.db を探す（os.path.abspath(__file__) を使う）。別のフォルダから実行しても、そのフォルダに data/ は作られないことを確認
 - queries/win_draw_lose.sql に WHERE を足し、徳島の試合だけを数える。他チーム同士の引き分けが混ざらないことを確認（今の DB では 5勝2分6敗のまま）
 - test_fetch_jleague.py と save_test_html.py は、まだ実行した場所を基準に data/ を探す（リポジトリのフォルダで実行すること）
+
+## 2026-11-02 試合番号を match.xml から集める（B案）
+
+- jleague.jp の robots.txt を再確認：/match/ の取得禁止は `/match/*/201*`（2010〜2019年）だけで変わりなし。Sitemap は https://www.jleague.jp/sitemap.xml
+- sitemap.xml は目次で、試合ページの一覧は https://www.jleague.jp/match.xml。1件ごとに試合ページのURL（大会・年・6桁の番号）と lastmod があるだけで、チーム名は載っていない
+- lastmod は一覧を作り直した時刻でそろって書き換わるため、試合日には使えない
+- match.xml の j2/2026 は220件（2026-11-02時点）。2月・5月は0件、8月40・11月60・12月20件。まだやっていない試合も、日程が決まった分は載っている
+- まだやっていない試合（pre-game）のページにも、節・試合日・ホーム・アウェイが載っていることを確認（2026112913 第20節 いわきFC 対 北海道コンサドーレ札幌、practice/probe_pregame.py で確認）
+- J2の全試合の対戦表を作る（A案）。fixtures テーブル（game_id / season / section / match_date / kickoff / home_club / away_club / game_type / checked_at）を data/vortis.db に置く
+- update_fixtures.py：match.xml から j2/2026・j2/2027 の番号だけ拾う（それ以外の年は robots.txt の都合で拾わない）。対戦表にない試合と、まだ終わっていないのに試合日が過ぎた試合（延期など）だけ見に行く。2秒待つ。最後に match_list.txt と答え合わせを表示する
+- fetch_jleague.py に parse_fixture を追加（試合の状態に関係なくチームを探す。得点者は取らない）。parse_match は変えていない
+- 進め方：今回は対戦表まで。main.py を対戦表から選ぶ形に変えるのは、答え合わせが一致してから（A案）
+- 2026-11-02 本番の実行結果：match.xml の J2（2026・2027年）は380件（38節×10試合、シーズン全部の日程が載っている）。380件すべて失敗なしで対戦表に入った。SQL で確認：全380試合、どの節も10試合、徳島は38試合
+- 答え合わせで、match_list.txt に書き忘れていた第14節（2026103121 徳島ヴォルティス 対 横浜FC、10/31）が見つかった。match_list.txt に足して main.py で保存し、答え合わせは14試合で「一致しました」
+- 弱点：まだ先の試合の日程が前倒しになった場合など、試合日が過ぎる前の変更は拾わない。対戦表を使い始めてから様子を見る

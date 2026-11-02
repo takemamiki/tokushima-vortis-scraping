@@ -6,8 +6,9 @@ fetch_jleague.py の parse_match が返した試合データを、SQLite（data/
     ページからデータを取り出すのは fetch_jleague.py の役目。
 
 テーブル：
-    matches … 1試合＝1行（シーズン・節・試合日・スコア）
-    goals   … 1得点＝1行（得点者・得点時間・オウンゴールか）
+    matches  … 1試合＝1行（シーズン・節・試合日・スコア）
+    goals    … 1得点＝1行（得点者・得点時間・オウンゴールか）
+    fixtures … 対戦表。J2の全試合（まだやっていない試合も含む）＝1行
 
 ルール（docs/decisions.md）：
     - 得点者は goals テーブルだけを正とする（matches に scorers / minutes 列は持たない）。
@@ -51,6 +52,35 @@ CREATE TABLE IF NOT EXISTS goals (
 )
 """
 
+CREATE_FIXTURES_SQL = """
+CREATE TABLE IF NOT EXISTS fixtures (
+    game_id    TEXT    PRIMARY KEY,
+    season     TEXT    NOT NULL,
+    section    INTEGER NOT NULL,
+    match_date TEXT    NOT NULL,
+    kickoff    TEXT    NOT NULL,
+    home_club  TEXT    NOT NULL,
+    away_club  TEXT    NOT NULL,
+    game_type  TEXT    NOT NULL,
+    checked_at TEXT    NOT NULL
+)
+"""
+
+UPSERT_FIXTURE_SQL = """
+INSERT INTO fixtures
+    (game_id, season, section, match_date, kickoff, home_club, away_club, game_type, checked_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+ON CONFLICT(game_id) DO UPDATE SET
+    season = excluded.season,
+    section = excluded.section,
+    match_date = excluded.match_date,
+    kickoff = excluded.kickoff,
+    home_club = excluded.home_club,
+    away_club = excluded.away_club,
+    game_type = excluded.game_type,
+    checked_at = excluded.checked_at
+"""
+
 INSERT_MATCH_SQL = """
 INSERT OR IGNORE INTO matches
     (game_id, season, section, match_date, home_club, away_club, home_score, away_score)
@@ -74,6 +104,7 @@ def _connect(db_path: str = DB_PATH) -> sqlite3.Connection:
     with conn:
         conn.execute(CREATE_MATCHES_SQL)
         conn.execute(CREATE_GOALS_SQL)
+        conn.execute(CREATE_FIXTURES_SQL)
     _check_new_layout(conn, db_path)
     return conn
 
@@ -156,3 +187,35 @@ def save_match_data(match: dict, db_path: str = DB_PATH) -> bool:
         conn.close()
 
     return True
+
+
+def load_fixtures(db_path: str = DB_PATH) -> dict:
+    """対戦表を {game_id: {"match_date": ..., "game_type": ...}} で返す"""
+    conn = _connect(db_path)
+    try:
+        rows = conn.execute(
+            "SELECT game_id, match_date, game_type FROM fixtures"
+        ).fetchall()
+    finally:
+        conn.close()
+    return {r[0]: {"match_date": r[1], "game_type": r[2]} for r in rows}
+
+
+def save_fixture(fixture: dict, checked_at: str, db_path: str = DB_PATH) -> None:
+    """対戦表に1試合ぶんを保存する。同じ game_id があれば中身を新しくする（延期で日付が変わった場合など）"""
+    conn = _connect(db_path)
+    try:
+        with conn:
+            conn.execute(UPSERT_FIXTURE_SQL, (
+                fixture["game_id"],
+                fixture["season"],
+                int(fixture["section"]),
+                fixture["match_date"],
+                fixture["kickoff"],
+                fixture["home_club"],
+                fixture["away_club"],
+                fixture["game_type"],
+                checked_at,
+            ))
+    finally:
+        conn.close()

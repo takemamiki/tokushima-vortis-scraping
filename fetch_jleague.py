@@ -198,6 +198,75 @@ def parse_match(payload, year, number):
     }
 
 
+def find_team_any(payload, key, game_id):
+    """
+    対戦表用：試合の状態に関係なく、チームのデータ（name を持つもの）を探す。
+    まだやっていない試合には得点者リストがないため、find_team とは別に用意する。
+    名前が1つに決まらないときは、得点者リストを持つものを優先する。それでも決まらなければ止める。
+    """
+    found = [(pos, v) for pos, v in get_all_values(payload, key)
+             if isinstance(v, dict) and isinstance(v.get("name"), str)]
+    if not found:
+        raise ValueError(f"{game_id}: {key} が見つかりません")
+    names = {normalize(v["name"]) for _, v in found}
+    if len(names) == 1:
+        return found[0]
+    with_scores = [(pos, v) for pos, v in found if "playerScoreList" in v]
+    if len({normalize(v["name"]) for _, v in with_scores}) == 1:
+        return with_scores[0]
+    raise ValueError(f"{game_id}: {key} の名前を1つに決められません（{names}）")
+
+
+def parse_fixture(payload, year, number):
+    """
+    対戦表用：試合が終わっていてもいなくても、節・試合日・ホーム・アウェイ・試合の状態を返す。
+    得点者は取らない（得点者は parse_match の役目）。
+    """
+    game_id = f"{year}{number}"
+
+    game_type = get_game_type(payload, game_id)
+    away_pos, away = find_team_any(payload, "awayTeam", game_id)
+    home_pos, home = find_team_any(payload, "homeTeam", game_id)
+
+    # 試合日（awayTeam と homeTeam の間にある "$D…" の日付。parse_match と同じ探し方）
+    low, high = sorted([away_pos, home_pos])
+    date_raw = None
+    for pos, v in get_all_values(payload, "date"):
+        if isinstance(v, str) and v.startswith("$D") and low < pos < high:
+            date_raw = v
+            break
+    if date_raw is None:
+        raise ValueError(f"{game_id}: 試合日が見つかりません")
+
+    utc = datetime.fromisoformat(date_raw.replace("$D", "").replace("Z", "+00:00"))
+    jst = utc.astimezone(timezone(timedelta(hours=9)))
+    if str(jst.year) != str(year):
+        raise ValueError(f"{game_id}: URL の年（{year}）と試合日（{jst:%Y-%m-%d}）が合いません")
+
+    # シーズン：試合日から計算する。seasonYear が見つかれば、それと合うかも確かめる
+    season_year = season_start_from_date(jst)
+    years = get_all_values(payload, "seasonYear")
+    if years:
+        _, found_year = min(years, key=lambda x: abs(x[0] - away_pos))
+        if int(found_year) != season_year:
+            raise ValueError(
+                f"{game_id}: シーズンが合いません"
+                f"（seasonYear={found_year}、試合日から計算={season_year}）"
+            )
+    season = f"{season_year}-{(season_year + 1) % 100:02d}"
+
+    return {
+        "game_id": game_id,
+        "season": season,
+        "section": get_section(payload, game_id),
+        "match_date": jst.strftime("%Y-%m-%d"),
+        "kickoff": jst.strftime("%H:%M"),
+        "home_club": normalize(home["name"]),
+        "away_club": normalize(away["name"]),
+        "game_type": game_type,
+    }
+
+
 if __name__ == "__main__":
     import time
 
