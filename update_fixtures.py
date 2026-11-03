@@ -13,8 +13,8 @@ Jリーグ公式サイトの match.xml（試合ページの一覧）から J2 �
 
 見に行く試合：
     - 対戦表にまだない試合
-    - 対戦表にあるが、まだ終わっていない（post-game 以外）のに試合日が今日より前の試合
-      （延期で日付が変わった、または終わったのにまだ反映していない試合）
+    - 対戦表にあるが、まだ終わっていない（post-game 以外）のに試合日が今日まで（今日を含む）の試合
+      （今日の試合、延期で日付が変わった、または終わったのにまだ反映していない試合）
 
 ルール：
     - 2026年と2027年以外の番号は拾わない（robots.txt で 2010〜2019年の試合ページは取得禁止のため）
@@ -72,7 +72,7 @@ def needs_check(game_id: str, known: dict, today: str) -> bool:
     if game_id not in known:
         return True
     f = known[game_id]
-    return f["game_type"] != "post-game" and f["match_date"] < today
+    return f["game_type"] != "post-game" and f["match_date"] <= today
 
 
 def compare_with_match_list(db_path: str = DB_PATH) -> None:
