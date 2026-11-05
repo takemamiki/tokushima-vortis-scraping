@@ -12,6 +12,9 @@ SQLite（data/vortis.db）に保存する。
     - 保存済みの試合は、試合ページを取りに行かない（アクセスを減らすため）。
     - 試合が終わっていない（post-game 以外）試合は保存しない。
     - 1試合で失敗しても止まらずに次へ進み、最後に失敗した試合をまとめて表示する。
+      通信エラー・データのエラー（想定内）も、それ以外のエラー（想定外）も同じく次へ進む。
+      失敗した試合は何も保存されないので、次の実行でもう一度取りに行く。
+    - ただし RuntimeError（昔の形のデータベースなど、全試合に関わる問題）は全体を止める。
 """
 
 import os
@@ -71,7 +74,7 @@ def main() -> None:
 
     saved_count = 0
     not_finished = []
-    failed = []
+    failed = []  # [(game_id, エラーの種類), ...]
 
     for year, number in match_list:
         game_id = f"{year}{number}"
@@ -92,9 +95,18 @@ def main() -> None:
         except MatchNotFinished as e:
             print(f"保存しません: {e}")
             not_finished.append(game_id)
+        except RuntimeError:
+            # 昔の形のデータベースなど、全試合に関わる問題。次へ進まず全体を止める
+            raise
         except (requests.RequestException, ValueError) as e:
-            print(f"失敗しました: {game_id}（{e}）")
-            failed.append(game_id)
+            # 想定内の失敗（通信エラー、データがおかしいと判断して止めたもの）
+            print(f"失敗しました: {game_id}（{type(e).__name__}: {e}）")
+            failed.append((game_id, type(e).__name__))
+        except Exception as e:
+            # 想定外の失敗（ページの形が変わった KeyError、制約違反の IntegrityError など）
+            # 1試合だけの問題として記録し、次の試合へ進む
+            print(f"【想定外】失敗しました: {game_id}（{type(e).__name__}: {e}）")
+            failed.append((game_id, type(e).__name__))
 
         time.sleep(WAIT_SECONDS)
 
@@ -102,7 +114,9 @@ def main() -> None:
     if not_finished:
         print(f"まだ終わっていない試合: {not_finished}")
     if failed:
-        print(f"失敗した試合: {failed}（次の実行でもう一度取りに行きます）")
+        print("失敗した試合（次の実行でもう一度取りに行きます）:")
+        for game_id, error_type in failed:
+            print(f"  {game_id}（{error_type}）")
 
 
 if __name__ == "__main__":
