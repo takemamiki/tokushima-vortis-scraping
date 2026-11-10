@@ -16,7 +16,7 @@ v1.0（いったん完成）の条件は docs/decisions.md の「2026-11-05 v1.0
 
 ## 明日やること（2026-11-10）
 
-- [ ] tokushima_goals.sql にも season の絞り込みを足す（他の集計SQLとそろえる。コミットは単独で）
+- [x] tokushima_goals.sql にも season の絞り込みを足す（他の集計SQLとそろえる。コミットは単独で）
 - [ ] グラフ1枚：queries/points_by_section.sql の結果を matplotlib で折れ線グラフにする
   - 完成の条件：第1節〜最新節まで並ぶ、PNGで保存、最後の値がSQLの累計勝ち点と一致
 
