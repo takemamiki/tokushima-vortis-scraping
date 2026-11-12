@@ -10,20 +10,22 @@ v1.0（いったん完成）の条件は docs/decisions.md の「2026-11-05 v1.0
   - tokushima_goals.sql：得点者の一覧（OGは「（OG）」付きで表示）
   - tokushima_fixtures.sql：徳島の対戦表
   - points_by_section.sql：節ごとの勝ち点と累計（グラフの元データ）
-- [ ] グラフ1枚（matplotlib。節ごとの累計勝ち点の推移）
+- [x] グラフ1枚（matplotlib。節ごとの累計勝ち点の推移）
 - [ ] README 仕上げ（使い方、update_fixtures.py の使い方、「Python 3.9以上」）
 - [ ] 余裕があれば：parse_match の試合日の探し方を parse_fixture と同じ sorted() の形にそろえる
 
-## 明日やること（2026-11-10）
+## 明日やること（2026-11-12）
 
 - [x] tokushima_goals.sql にも season の絞り込みを足す（他の集計SQLとそろえる。コミットは単独で）
-- [ ] グラフ1枚：queries/points_by_section.sql の結果を matplotlib で折れ線グラフにする
+- [x] グラフ1枚：queries/points_by_section.sql の結果を matplotlib で折れ線グラフにする
   - 完成の条件：第1節〜最新節まで並ぶ、PNGで保存、最後の値がSQLの累計勝ち点と一致
 
 ## 記録
 
 - 2026-11-08：queries/ の4本が今のテーブルで動くことを確認（15試合 5勝2分8敗、勝ち点17）
 - 2026-11-09：第16節（宮崎戦 1-2）を取得、Jリーグ公式と一致。未コミットだったSQL2本を確認してコミット。points_by_section.sql を追加。game_id の型は matches 16・fixtures 380・goals 29 すべて text。tokushima_goals.sql で OG に「（OG）」を付けた
+- 2026-11-10：tokushima_goals.sql に season の絞り込みを追加（'2025-26' で0行を確認）。表示名を日本語にそろえた
+- 2026-11-12：make_graph.py で節ごとの累計勝ち点のグラフを作成（output/points_by_section.png）。第16節時点の累計勝ち点17が SQL と一致。'2025-26' で「結果が0行です」で止まることを確認。縦軸の目盛りを整数だけにした
 
 ## メモ
 

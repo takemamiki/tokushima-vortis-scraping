@@ -45,6 +45,7 @@
 
 - save_data.py の _connect() に `PRAGMA foreign_keys = ON` を追加（SQLiteは初期設定でオフ、接続ごとに必要）
 - check_fk.py で確認：PRAGMA foreign_keys = 1、存在しない game_id の goals への INSERT が「FOREIGN KEY constraint failed」で止まることを確認
+
 ## 2026-10-30 Jリーグ公式から DB を作り直した
 
 - jleague.jp の robots.txt と利用規約は 2026-10-29 に確認済み（問題なし）。10-30 に robots.txt を再確認：`/match/*/201*`（2010〜2019年の試合ページ）は取得禁止。2020年以降の /match/j2/ は対象外で取得可
@@ -91,6 +92,7 @@
 - 今後、取ってきたページを丸ごと保存するときは、最初から .gitignore の対象の場所に置く
 
 ## 2026-11-05 v1.0（いったん完成）の条件
+
 - Jリーグ公式から徳島の今シーズン全試合を取得できる（試合番号は match_list.txt の手書きでOK）
 - matches＋goals に SQLite で保存し、2回動かしても重複しない
 - 集計SQLが数本動く（勝敗・得点ランキングなど）
@@ -99,7 +101,14 @@
 - 試合番号の自動収集（match.xml）と他チームのデータは v2 以降に回す
 
 ## 2026-11-05 main.py のエラーの扱い（A案）
+
 - 1試合で失敗したら、エラーの種類に関係なくその試合だけ「失敗」にして次へ進む
 - 想定外のエラー（KeyError、IntegrityError など）は「【想定外】」と表示し、中身を見て直す
 - RuntimeError（昔の形のDBなど、全試合に関わる問題）は全体を止める
 - 確認は test_main_errors.py（サイトにも本物のDBにも触らない）
+
+## 2026-11-12 グラフの保存先（A案）
+
+- グラフは output/points_by_section.png に保存し、GitHub にも上げる
+- 理由：vortis.db は公開しないため、README で結果を見せるには画像が必要
+- 更新時は作り直してコミットし、README に「第◯節時点」と書く
